@@ -27,6 +27,33 @@ func TestSnapshotRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSnapshotWithPrefixCache(t *testing.T) {
+	items := testItems()
+	engine, err := New(items, WithBloom(100), WithFallbackField("category"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := engine.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	restored, err := NewFromSnapshot(data, items, WithPrefixCache([]string{"b", "ni"}))
+	if err != nil {
+		t.Fatalf("NewFromSnapshot with WithPrefixCache: %v", err)
+	}
+
+	results := restored.Search("b")
+	if len(results) == 0 {
+		t.Fatal("expected cached prefix results from restored engine")
+	}
+
+	results = restored.Search("nike")
+	if len(results) == 0 {
+		t.Fatal("expected normal search results from restored engine")
+	}
+}
+
 func TestSnapshotVersionRejection(t *testing.T) {
 	engine, err := New(testItems())
 	if err != nil {
