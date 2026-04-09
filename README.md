@@ -122,9 +122,9 @@ These numbers are machine-dependent. Refresh this section with
 <!-- BENCHMARKS:START -->
 _Generated from `profiles/benchmarks/bench-latest.txt` via `make bench-readme`. Metric cells are medians across the recorded samples._
 
-- Commit: `28bda81`
+- Commit: `2e15419`
 - Branch: `main (dirty)`
-- Date: `2026-04-09T16:28:20+01:00`
+- Date: `2026-04-09T16:45:30+01:00`
 - Filter: `^Benchmark`
 - Count: `3`
 - Time: `100ms`
@@ -135,114 +135,114 @@ _Generated from `profiles/benchmarks/bench-latest.txt` via `make bench-readme`. 
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | ---: | ---: | ---: |
-| `default/docs_128` | 4576235 | 3655290 | 24995 |
-| `default/docs_2048` | 76754792 | 57548048 | 278375 |
-| `default/docs_8192` | 309017926 | 231610392 | 1054355 |
-| `bloom/docs_128` | 5554090 | 4040744 | 26853 |
-| `bloom/docs_2048` | 88319130 | 63766544 | 308075 |
-| `bloom/docs_8192` | 352020980 | 256527752 | 1173142 |
-| `fallback/docs_128` | 4984208 | 3665408 | 25099 |
-| `fallback/docs_2048` | 78635950 | 57588864 | 278511 |
-| `fallback/docs_8192` | 305023837 | 231820192 | 1054515 |
-| `full/docs_128` | 5512208 | 4050864 | 26957 |
-| `full/docs_2048` | 87880552 | 63807392 | 308211 |
-| `full/docs_8192` | 355866777 | 256737536 | 1173302 |
+| `default/docs_128` | 4494809 | 3655594 | 25003 |
+| `default/docs_2048` | 77177376 | 57548336 | 278383 |
+| `default/docs_8192` | 322137476 | 231610712 | 1054363 |
+| `bloom/docs_128` | 5478499 | 4041048 | 26861 |
+| `bloom/docs_2048` | 88669916 | 63766856 | 308083 |
+| `bloom/docs_8192` | 351805438 | 256528040 | 1173150 |
+| `fallback/docs_128` | 5196454 | 3665712 | 25107 |
+| `fallback/docs_2048` | 77168720 | 57589168 | 278519 |
+| `fallback/docs_8192` | 306155469 | 231820480 | 1054523 |
+| `full/docs_128` | 5608596 | 4051168 | 26965 |
+| `full/docs_2048` | 87649232 | 63807696 | 308219 |
+| `full/docs_8192` | 352762781 | 256737840 | 1173310 |
 
 ### Snapshot Encode
 
 | Benchmark | ns/op | MB/s | B/op | allocs/op |
 | --- | ---: | ---: | ---: | ---: |
-| `default/docs_128` | 928303 | 146.29 | 305469 | 30 |
-| `default/docs_2048` | 11302960 | 216.43 | 4939900 | 35 |
-| `default/docs_8192` | 42493845 | 233.10 | 19894018 | 47 |
-| `full/docs_128` | 952087 | 144.50 | 303711 | 31 |
-| `full/docs_2048` | 10953426 | 224.60 | 4972646 | 35 |
-| `full/docs_8192` | 41143136 | 241.39 | 19947856 | 59 |
+| `default/docs_128` | 953422 | 142.44 | 321264 | 34 |
+| `default/docs_2048` | 10975199 | 222.89 | 4939841 | 35 |
+| `default/docs_8192` | 41514521 | 238.59 | 19894912 | 53 |
+| `full/docs_128` | 969484 | 141.91 | 281605 | 27 |
+| `full/docs_2048` | 11004279 | 223.56 | 4977077 | 37 |
+| `full/docs_8192` | 41345153 | 240.21 | 19943298 | 50 |
 
 ### Snapshot Load
 
 | Benchmark | ns/op | MB/s | B/op | allocs/op |
 | --- | ---: | ---: | ---: | ---: |
-| `default/docs_128` | 3022126 | 44.94 | 1315416 | 13858 |
-| `default/docs_2048` | 42967470 | 56.93 | 18099186 | 132872 |
-| `default/docs_8192` | 148882528 | 66.53 | 71957224 | 506547 |
-| `full/docs_128` | 3095968 | 44.44 | 1327208 | 13967 |
-| `full/docs_2048` | 41679281 | 59.02 | 18164728 | 133013 |
-| `full/docs_8192` | 151369912 | 65.61 | 72265448 | 506712 |
+| `default/docs_128` | 3040189 | 44.67 | 1315576 | 13860 |
+| `default/docs_2048` | 40433985 | 60.50 | 18099346 | 132874 |
+| `default/docs_8192` | 146434385 | 67.64 | 71957384 | 506549 |
+| `full/docs_128` | 3112726 | 44.20 | 1327368 | 13969 |
+| `full/docs_2048` | 41701350 | 58.99 | 18164893 | 133015 |
+| `full/docs_8192` | 144527378 | 68.72 | 72265608 | 506714 |
 
 ### Component
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | ---: | ---: | ---: |
-| `bloom/add` | 19.00 | 0 | 0 |
-| `bloom/may_contain_hit` | 15.03 | 0 | 0 |
-| `bloom/may_contain_miss` | 6.384 | 0 | 0 |
-| `extract_trigrams/allocating_medium` | 137.5 | 320 | 1 |
-| `extract_trigrams/buffered_medium` | 13.68 | 0 | 0 |
-| `extract_trigrams/buffered_long` | 37.65 | 0 | 0 |
-| `tokenize/ascii` | 270.3 | 208 | 3 |
-| `tokenize/mixed_case_unicode` | 465.9 | 248 | 8 |
-| `bm25/docs_128` | 29613 | 2336 | 10 |
-| `ngram/docs_128` | 9464 | 5088 | 7 |
-| `bm25/docs_2048` | 423640 | 31512 | 14 |
-| `ngram/docs_2048` | 18997 | 20016 | 10 |
-| `fallback/exact/docs_128` | 12.08 | 0 | 0 |
-| `fallback/best/docs_128` | 121.0 | 0 | 0 |
-| `fallback/exact/docs_2048` | 12.24 | 0 | 0 |
-| `fallback/best/docs_2048` | 119.3 | 0 | 0 |
+| `bloom/add` | 18.99 | 0 | 0 |
+| `bloom/may_contain_hit` | 15.05 | 0 | 0 |
+| `bloom/may_contain_miss` | 6.002 | 0 | 0 |
+| `extract_trigrams/allocating_medium` | 144.7 | 320 | 1 |
+| `extract_trigrams/buffered_medium` | 13.60 | 0 | 0 |
+| `extract_trigrams/buffered_long` | 37.69 | 0 | 0 |
+| `tokenize/ascii` | 275.9 | 208 | 3 |
+| `tokenize/mixed_case_unicode` | 468.1 | 248 | 8 |
+| `bm25/docs_128` | 25112 | 2144 | 8 |
+| `ngram/docs_128` | 9455 | 5088 | 7 |
+| `bm25/docs_2048` | 386813 | 31320 | 12 |
+| `ngram/docs_2048` | 19010 | 20016 | 10 |
+| `fallback/exact/docs_128` | 11.99 | 0 | 0 |
+| `fallback/best/docs_128` | 128.7 | 0 | 0 |
+| `fallback/exact/docs_2048` | 12.23 | 0 | 0 |
+| `fallback/best/docs_2048` | 117.9 | 0 | 0 |
 
 ### Search
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | ---: | ---: | ---: |
-| `exact/default/docs_128` | 44499 | 14320 | 77 |
-| `exact/default/docs_2048` | 535314 | 131009 | 91 |
-| `exact/default/docs_8192` | 1998356 | 520354 | 101 |
-| `exact/bloom/docs_128` | 42744 | 14320 | 77 |
-| `exact/bloom/docs_2048` | 496903 | 131008 | 91 |
-| `exact/bloom/docs_8192` | 2159095 | 520354 | 101 |
-| `prefix/default/docs_128` | 9620 | 8688 | 73 |
-| `prefix/default/docs_2048` | 47724 | 36048 | 83 |
-| `prefix/default/docs_8192` | 173056 | 131472 | 89 |
-| `typo/default/docs_128` | 9084 | 5440 | 12 |
-| `typo/default/docs_2048` | 21655 | 20448 | 15 |
-| `typo/default/docs_8192` | 35474 | 9712 | 13 |
-| `typo/bloom/docs_128` | 9271 | 5440 | 12 |
-| `typo/bloom/docs_2048` | 21971 | 20448 | 15 |
-| `typo/bloom/docs_8192` | 36372 | 9712 | 13 |
-| `miss/default/docs_128` | 2445 | 80 | 2 |
-| `miss/default/docs_2048` | 2540 | 80 | 2 |
-| `miss/default/docs_8192` | 2508 | 80 | 2 |
-| `miss_bloom/bloom/docs_128` | 373.3 | 16 | 1 |
-| `miss_bloom/bloom/docs_2048` | 370.6 | 16 | 1 |
-| `miss_bloom/bloom/docs_8192` | 361.2 | 16 | 1 |
-| `fallback_exact/fallback/docs_128` | 5657 | 6680 | 46 |
-| `fallback_exact/fallback/docs_2048` | 20211 | 27032 | 46 |
-| `fallback_exact/fallback/docs_8192` | 66036 | 103616 | 48 |
-| `fallback_typo/fallback/docs_128` | 6028 | 4208 | 15 |
-| `fallback_typo/fallback/docs_2048` | 40529 | 34544 | 27 |
-| `fallback_typo/fallback/docs_8192` | 39534 | 34032 | 27 |
-| `scorer/default/docs_128` | 9275 | 8864 | 65 |
-| `scorer/default/docs_2048` | 64141 | 40512 | 75 |
-| `scorer/default/docs_8192` | 252773 | 149504 | 81 |
-| `limit_10/default/docs_128` | 8359 | 8248 | 62 |
-| `limit_10/default/docs_2048` | 57840 | 35608 | 72 |
-| `limit_10/default/docs_8192` | 231125 | 131032 | 78 |
-| `limit_100/wide/docs_128` | 10358 | 11560 | 92 |
-| `limit_100/wide/docs_2048` | 103868 | 84648 | 522 |
-| `limit_100/wide/docs_8192` | 344872 | 180072 | 528 |
-| `multiword/default/docs_128` | 13453 | 8616 | 61 |
-| `multiword/default/docs_2048` | 96400 | 35624 | 66 |
-| `multiword/default/docs_8192` | 381849 | 133576 | 78 |
+| `exact/default/docs_128` | 41148 | 11952 | 71 |
+| `exact/default/docs_2048` | 452415 | 87808 | 77 |
+| `exact/default/docs_8192` | 1813745 | 329578 | 79 |
+| `exact/bloom/docs_128` | 35947 | 11952 | 71 |
+| `exact/bloom/docs_2048` | 424352 | 87808 | 77 |
+| `exact/bloom/docs_8192` | 1833319 | 329578 | 79 |
+| `prefix/default/docs_128` | 7060 | 7936 | 70 |
+| `prefix/default/docs_2048` | 28567 | 25728 | 74 |
+| `prefix/default/docs_8192` | 103516 | 88448 | 76 |
+| `typo/default/docs_128` | 8591 | 5248 | 10 |
+| `typo/default/docs_2048` | 20979 | 20256 | 13 |
+| `typo/default/docs_8192` | 35531 | 9520 | 11 |
+| `typo/bloom/docs_128` | 8927 | 5248 | 10 |
+| `typo/bloom/docs_2048` | 21410 | 20256 | 13 |
+| `typo/bloom/docs_8192` | 36681 | 9520 | 11 |
+| `miss/default/docs_128` | 2210 | 16 | 1 |
+| `miss/default/docs_2048` | 2221 | 16 | 1 |
+| `miss/default/docs_8192` | 2277 | 16 | 1 |
+| `miss_bloom/bloom/docs_128` | 365.6 | 16 | 1 |
+| `miss_bloom/bloom/docs_2048` | 363.3 | 16 | 1 |
+| `miss_bloom/bloom/docs_8192` | 368.1 | 16 | 1 |
+| `fallback_exact/fallback/docs_128` | 5768 | 6680 | 46 |
+| `fallback_exact/fallback/docs_2048` | 21150 | 27032 | 46 |
+| `fallback_exact/fallback/docs_8192` | 65802 | 103616 | 48 |
+| `fallback_typo/fallback/docs_128` | 5393 | 3456 | 12 |
+| `fallback_typo/fallback/docs_2048` | 31905 | 24224 | 18 |
+| `fallback_typo/fallback/docs_8192` | 31005 | 23712 | 18 |
+| `scorer/default/docs_128` | 9424 | 8112 | 62 |
+| `scorer/default/docs_2048` | 49113 | 30192 | 66 |
+| `scorer/default/docs_8192` | 197358 | 106480 | 68 |
+| `limit_10/default/docs_128` | 8806 | 7496 | 59 |
+| `limit_10/default/docs_2048` | 42113 | 25288 | 63 |
+| `limit_10/default/docs_8192` | 168879 | 88008 | 65 |
+| `limit_100/wide/docs_128` | 10437 | 10808 | 89 |
+| `limit_100/wide/docs_2048` | 85380 | 74328 | 513 |
+| `limit_100/wide/docs_8192` | 264122 | 137048 | 515 |
+| `multiword/default/docs_128` | 11214 | 7848 | 58 |
+| `multiword/default/docs_2048` | 75398 | 25288 | 57 |
+| `multiword/default/docs_8192` | 306857 | 90536 | 65 |
 
 ### Parallel Search
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | ---: | ---: | ---: |
-| `exact/default/docs_8192` | 2011297 | 520357 | 101 |
-| `typo/default/docs_8192` | 37353 | 9712 | 13 |
-| `miss/default/docs_8192` | 2479 | 80 | 2 |
-| `miss_bloom/bloom/docs_8192` | 371.6 | 16 | 1 |
+| `exact/default/docs_8192` | 1862987 | 329580 | 79 |
+| `typo/default/docs_8192` | 36352 | 9520 | 11 |
+| `miss/default/docs_8192` | 2267 | 16 | 1 |
+| `miss_bloom/bloom/docs_8192` | 363.0 | 16 | 1 |
 <!-- BENCHMARKS:END -->
 
 ## License

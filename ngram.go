@@ -22,6 +22,7 @@ type prefixEntry struct {
 
 type ngramIndex struct {
 	fields        map[string]*ngramFieldIndex
+	fieldList     []*ngramFieldIndex
 	sortedPrimary []prefixEntry
 }
 
@@ -66,6 +67,7 @@ func newNgramIndex(items []preparedItem) *ngramIndex {
 					docWeights:    make([]float64, n),
 				}
 				idx.fields[field.Name] = fi
+				idx.fieldList = append(idx.fieldList, fi)
 			}
 			unique := make(map[string]struct{})
 			for _, value := range field.Values {
@@ -123,7 +125,7 @@ func (idx *ngramIndex) SearchWithGrams(queryGrams []string) []ngramSearchResult 
 		return nil
 	}
 	accum := make(map[int]float64)
-	for _, fieldIdx := range idx.fields {
+	for _, fieldIdx := range idx.fieldList {
 		fieldIdx.searchWithGramsInto(queryGrams, accum)
 	}
 	results := make([]ngramSearchResult, 0, len(accum))
@@ -258,6 +260,7 @@ func (idx *ngramIndex) snapshot() ngramSnapshot {
 
 func ngramFromSnapshot(s ngramSnapshot, n int) *ngramIndex {
 	fields := make(map[string]*ngramFieldIndex, len(s.Fields))
+	fieldList := make([]*ngramFieldIndex, 0, len(s.Fields))
 	for name, snap := range s.Fields {
 		fi := &ngramFieldIndex{
 			posting:       snap.Posting,
@@ -269,9 +272,11 @@ func ngramFromSnapshot(s ngramSnapshot, n int) *ngramIndex {
 			return &buf
 		}}
 		fields[name] = fi
+		fieldList = append(fieldList, fi)
 	}
 	return &ngramIndex{
 		fields:        fields,
+		fieldList:     fieldList,
 		sortedPrimary: s.SortedPrimary,
 	}
 }
@@ -379,4 +384,3 @@ func (idx *fallbackIndex) best(query string, queryGrams []string) ([]int, bool) 
 	}
 	return idx.groupDocs[bestName], true
 }
-

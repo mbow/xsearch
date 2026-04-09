@@ -216,10 +216,11 @@ func (e *Engine) Search(query string, opts ...SearchOption) []Result {
 		queryGrams = slices.Compact(queryGrams)
 	}
 
-	direct := make(map[int]scoredCandidate)
+	var direct map[int]scoredCandidate
 
 	if len(queryGrams) == 0 {
 		if bm25Results := e.bm25.Search(query); len(bm25Results) > 0 {
+			direct = make(map[int]scoredCandidate, len(bm25Results))
 			for _, result := range bm25Results {
 				direct[result.Doc] = scoredCandidate{
 					doc:       result.Doc,
@@ -228,11 +229,14 @@ func (e *Engine) Search(query string, opts ...SearchOption) []Result {
 				}
 			}
 		} else {
-			for _, result := range e.ngram.Search(query) {
-				direct[result.Doc] = scoredCandidate{
-					doc:       result.Doc,
-					relevance: result.Score,
-					matchType: MatchDirect,
+			if ngramResults := e.ngram.Search(query); len(ngramResults) > 0 {
+				direct = make(map[int]scoredCandidate, len(ngramResults))
+				for _, result := range ngramResults {
+					direct[result.Doc] = scoredCandidate{
+						doc:       result.Doc,
+						relevance: result.Score,
+						matchType: MatchDirect,
+					}
 				}
 			}
 		}
@@ -247,6 +251,7 @@ func (e *Engine) Search(query string, opts ...SearchOption) []Result {
 		}
 
 		if bm25Results := e.bm25.Search(query); len(bm25Results) > 0 {
+			direct = make(map[int]scoredCandidate, len(bm25Results))
 			for _, result := range bm25Results {
 				direct[result.Doc] = scoredCandidate{
 					doc:       result.Doc,
@@ -255,11 +260,14 @@ func (e *Engine) Search(query string, opts ...SearchOption) []Result {
 				}
 			}
 		} else {
-			for _, result := range e.ngram.SearchWithGrams(queryGrams) {
-				direct[result.Doc] = scoredCandidate{
-					doc:       result.Doc,
-					relevance: result.Score,
-					matchType: MatchDirect,
+			if ngramResults := e.ngram.SearchWithGrams(queryGrams); len(ngramResults) > 0 {
+				direct = make(map[int]scoredCandidate, len(ngramResults))
+				for _, result := range ngramResults {
+					direct[result.Doc] = scoredCandidate{
+						doc:       result.Doc,
+						relevance: result.Score,
+						matchType: MatchDirect,
+					}
 				}
 			}
 		}
@@ -267,7 +275,12 @@ func (e *Engine) Search(query string, opts ...SearchOption) []Result {
 
 	if len(direct) < defaultMinDirectResults {
 		if docs, ok := e.fallback.best(query, queryGrams); ok {
-			maps.Copy(direct, fallbackCandidates(docs, direct))
+			fallback := fallbackCandidates(docs, direct)
+			if direct == nil {
+				direct = fallback
+			} else {
+				maps.Copy(direct, fallback)
+			}
 		}
 	}
 

@@ -120,6 +120,17 @@ func tokenize(s string) []string {
 	return tokens
 }
 
+func tokenizeInto(tokens []string, s string) []string {
+	tokens = tokens[:0]
+	for field := range strings.FieldsSeq(s) {
+		lower := toLowerFast(field)
+		if hasAlphanumeric(lower) {
+			tokens = append(tokens, lower)
+		}
+	}
+	return tokens
+}
+
 func toLowerFast(s string) string {
 	for i := range len(s) {
 		if s[i] >= 'A' && s[i] <= 'Z' {

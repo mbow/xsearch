@@ -24,6 +24,7 @@ type bm25FieldIndex struct {
 
 type bm25Index struct {
 	fields         map[string]*bm25FieldIndex
+	fieldList      []*bm25FieldIndex
 	prefixPosting  map[string][]int
 	primaryWeights []float64
 	k1             float64
@@ -104,6 +105,7 @@ func newBM25Index(items []preparedItem, cfg engineConfig) *bm25Index {
 					posting:    make(map[string][]int),
 				}
 				idx.fields[field.Name] = fi
+				idx.fieldList = append(idx.fieldList, fi)
 				fieldStats[field.Name] = &stats{df: make(map[string]int)}
 			}
 
@@ -178,7 +180,7 @@ func (fi *bm25FieldIndex) scoreDoc(docID int, queryTerms []string, k1, b float64
 func (idx *bm25Index) maxQueryIDF(queryTerms []string) float64 {
 	maxIDF := 1.0
 	for _, term := range queryTerms {
-		for _, fieldIdx := range idx.fields {
+		for _, fieldIdx := range idx.fieldList {
 			if idf, ok := fieldIdx.idf[term]; ok && idf > maxIDF {
 				maxIDF = idf
 			}
@@ -188,7 +190,8 @@ func (idx *bm25Index) maxQueryIDF(queryTerms []string) float64 {
 }
 
 func (idx *bm25Index) Search(query string) []bm25SearchResult {
-	queryTerms := tokenize(query)
+	var queryTermBuf [8]string
+	queryTerms := tokenizeInto(queryTermBuf[:0], query)
 	if len(queryTerms) == 0 {
 		return nil
 	}
@@ -198,7 +201,7 @@ func (idx *bm25Index) Search(query string) []bm25SearchResult {
 	var touched []int
 
 	for _, term := range queryTerms {
-		for _, fieldIdx := range idx.fields {
+		for _, fieldIdx := range idx.fieldList {
 			for _, docID := range fieldIdx.posting[term] {
 				if seen[docID] == 0 {
 					touched = append(touched, docID)
@@ -224,7 +227,7 @@ func (idx *bm25Index) Search(query string) []bm25SearchResult {
 		s := seen[docID]
 		isPrefix := (s & 2) != 0
 		score := 0.0
-		for _, fieldIdx := range idx.fields {
+		for _, fieldIdx := range idx.fieldList {
 			score += fieldIdx.docWeights[docID] * fieldIdx.scoreDoc(docID, queryTerms, idx.k1, idx.b)
 		}
 		if isPrefix {
@@ -273,8 +276,9 @@ func (idx *bm25Index) snapshot() bm25Snapshot {
 
 func bm25FromSnapshot(s bm25Snapshot) *bm25Index {
 	fields := make(map[string]*bm25FieldIndex, len(s.Fields))
+	fieldList := make([]*bm25FieldIndex, 0, len(s.Fields))
 	for name, snap := range s.Fields {
-		fields[name] = &bm25FieldIndex{
+		fi := &bm25FieldIndex{
 			idf:        snap.IDF,
 			termFreqs:  snap.TermFreqs,
 			docLens:    snap.DocLens,
@@ -282,9 +286,12 @@ func bm25FromSnapshot(s bm25Snapshot) *bm25Index {
 			avgDocLen:  snap.AvgDocLen,
 			posting:    snap.Posting,
 		}
+		fields[name] = fi
+		fieldList = append(fieldList, fi)
 	}
 	idx := &bm25Index{
 		fields:         fields,
+		fieldList:      fieldList,
 		prefixPosting:  s.PrefixPosting,
 		primaryWeights: s.PrimaryWeights,
 		k1:             s.K1,
@@ -297,4 +304,3 @@ func bm25FromSnapshot(s bm25Snapshot) *bm25Index {
 	}
 	return idx
 }
-
