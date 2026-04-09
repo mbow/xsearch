@@ -2,47 +2,92 @@
 description: Run the benchmark suite and report performance changes
 ---
 
-Follow these steps exactly when the user asks you to "run the benchmarks and give me the change". 
+This repo's benchmarks live in the main package (`bench_test.go`), not in a
+`./benchmarks` directory. The supported workflow is:
 
-This workflow uses `benchstat` to compare benchmark results between different commits. Each benchmark file includes a metadata header with the commit SHA, branch, and timestamp.
+1. Install tools when needed:
+   ```bash
+   make install-tools
+   ```
+   This installs `benchstat` and the standalone `pprof` binary.
 
-1. **Prerequisites Checklist**
-Ensure `benchstat` is installed:
-`make install-tools`
+2. Run a quick local benchmark pass:
+   ```bash
+   make bench
+   ```
+   Defaults:
+   - package: `.`
+   - filter: `.`
+   - benchtime: `1s`
+   - cpu: `1`
 
-2. **Establish the Comparison State**
-Evaluate the user's intent:
-- **Scenario A:** Save the current state as the comparison baseline (before making changes):
-  ```bash
-  make bench-record
-  make bench-save
-  ```
-  This creates `bench-prev-<SHA>.txt` and symlinks `bench-prev.txt` to it.
+3. Record a benchmark file with commit metadata:
+   ```bash
+   make bench-record
+   ```
+   Output is written to `profiles/benchmarks/bench-latest.txt`.
 
-- **Scenario B (Most Common):** Code changes have been made. Record new benchmarks and compare:
-  ```bash
-  make bench-record
-  make bench-compare
-  ```
-  The compare target will **refuse** to run if `bench-prev` and `bench-latest` are from the same commit. If this happens, it means no code changes were made — there's nothing to compare.
+4. Save a baseline before making changes:
+   ```bash
+   make bench-record
+   make bench-save
+   ```
+   This creates `profiles/benchmarks/bench-prev-<SHA>.txt` and updates
+   `profiles/benchmarks/bench-prev.txt`.
 
-- **Scenario C:** Compare against the original pristine project baseline (historical progress):
-  ```bash
-  make bench-record
-  make bench-compare-baseline
-  ```
+5. Compare after code changes:
+   ```bash
+   make bench-record
+   make bench-compare
+   ```
+   `make bench-compare` prints the SHAs being compared and then runs
+   `benchstat`.
 
-3. **Compare and Output the Differences**
-`make bench-compare` prints the commit SHAs being compared (e.g., `Comparing abc1234 -> def5678`) followed by the benchstat output.
+6. Compare against a long-lived historical baseline:
+   ```bash
+   make bench-record
+   make bench-compare-baseline
+   ```
+   This expects `profiles/benchmarks/baseline.txt` to exist.
 
-4. **Summarize for the User**
-Read the output and present a clean summary:
-- **Performance Regressions:** Highlight any benchmarks that got slower, with the component name and percentage.
-- **Performance Improvements:** Highlight components that got faster.
-- **Unchanged:** Note paths that are stable (marked `~` by benchstat).
-- Use benchstat's p-values: only report changes where p < 0.05 as statistically significant.
+7. Focus on a subset when you want tighter numbers:
+   ```bash
+   make bench BENCH_FILTER='^Benchmark(BM25Search|NgramSearch)$'
+   make bench-record BENCH_FILTER='^BenchmarkBM25Search$' BENCH_COUNT=10 BENCH_TIME=2s
+   ```
 
-5. **Important: Same-commit guard**
-If `make bench-compare` errors with "same commit", it means `bench-prev.txt` was recorded from the same code as `bench-latest.txt`. This is a meaningless comparison. Tell the user they need to either:
-- Make code changes first, then `make bench-record && make bench-compare`
-- Or save a baseline from a different commit: checkout the old code, `make bench-record && make bench-save`, then checkout back and `make bench-record && make bench-compare`
+8. Profile with `pprof` when a benchmark regresses:
+   ```bash
+   make bench-pprof-cpu PPROF_NAME=bm25 BENCH_FILTER='^BenchmarkBM25Search$'
+   make bench-pprof-top-cpu PPROF_NAME=bm25
+
+   make bench-pprof-mem PPROF_NAME=ngram BENCH_FILTER='^BenchmarkNgramSearch$'
+   make bench-pprof-top-mem PPROF_NAME=ngram
+   ```
+   Profiles are written under `profiles/pprof/`. For an interactive view:
+   ```bash
+   pprof -http=:0 profiles/pprof/bm25_cpu.prof
+   ```
+   Memory profiling adds overhead. Use `bench-pprof-mem` for allocation
+   analysis, not for comparing `ns/op` against an ordinary `make bench` run.
+
+9. Summarize results carefully:
+   - Treat `benchstat` p-values below `0.05` as statistically significant.
+   - Call out regressions first, then improvements, then unchanged benchmarks (`~`).
+   - Mention the benchmark filter, count, benchtime, and CPU setting used for the run.
+
+10. Same-commit guard:
+    If `make bench-compare` says both files are from the same commit, the
+    comparison is meaningless. Either:
+    - make changes first, then run `make bench-record && make bench-compare`
+    - or record a baseline from a different commit with `make bench-record && make bench-save`
+
+## Current Gaps
+
+The workflow is now runnable, but the benchmark suite itself is still narrow.
+To improve measurement quality further, prefer adding:
+
+- index-build benchmarks (`New`, snapshot load, snapshot save)
+- query-path sub-benchmarks for exact match, typo match, bloom reject, and fallback
+- dataset-size variants so small and large corpora are measured separately
+- realistic fixtures larger than `testItems()` for search-path benchmarks

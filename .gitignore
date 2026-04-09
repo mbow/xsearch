@@ -1,0 +1,5 @@
+/profiles/benchmarks/
+/profiles/pprof/
+/search
+/*.test
+/.codex
