@@ -132,6 +132,9 @@ func NewFromSnapshot[T Searchable](data []byte, items []T, opts ...Option) (*Eng
 	if payload.Bloom != nil {
 		e.bloom = bloomFromSnapshot(*payload.Bloom)
 	}
+	if len(cfg.prefixCacheKeys) > 0 {
+		e.buildPrefixCache(cfg.prefixCacheKeys)
+	}
 	return e, nil
 }
 
