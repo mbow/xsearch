@@ -246,6 +246,23 @@ func TestPrefixCacheHit(t *testing.T) {
 	}
 }
 
+func TestPrefixCacheNormalization(t *testing.T) {
+	items := testItems()
+	engine, err := New(items, WithPrefixCache([]string{"B", "b", "BU", "bu", " b "}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r1 := engine.Search("b")
+	r2 := engine.Search("B")
+	if len(r1) == 0 {
+		t.Fatal("expected results for 'b'")
+	}
+	if len(r1) != len(r2) {
+		t.Fatalf("normalized queries should return same results: %d vs %d", len(r1), len(r2))
+	}
+}
+
 func TestPrefixCacheBypassWithScorer(t *testing.T) {
 	items := testItems()
 	engine, err := New(items, WithPrefixCache([]string{"bud"}))
