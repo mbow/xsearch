@@ -11,6 +11,7 @@ const (
 	optionAlpha
 	optionLimit
 	optionFallbackField
+	optionPrefixCache
 )
 
 type engineConfig struct {
@@ -20,6 +21,7 @@ type engineConfig struct {
 	alpha            float64
 	limit            int
 	fallbackField    string
+	prefixCacheKeys  []string
 }
 
 func defaultConfig() engineConfig {
@@ -45,7 +47,7 @@ func (o Option) applyTo(cfg *engineConfig) {
 
 func (o Option) validateForSnapshotLoad() error {
 	switch o.kind {
-	case optionAlpha, optionLimit:
+	case optionAlpha, optionLimit, optionPrefixCache:
 		return nil
 	case optionBloom:
 		return fmt.Errorf("xsearch: WithBloom cannot be used with NewFromSnapshot")
@@ -125,6 +127,16 @@ func WithFallbackField(fieldName string) Option {
 		kind: optionFallbackField,
 		apply: func(c *engineConfig) {
 			c.fallbackField = fieldName
+		},
+	}
+}
+
+// WithPrefixCache precomputes search results for the given prefixes at construction time.
+func WithPrefixCache(prefixes []string) Option {
+	return Option{
+		kind: optionPrefixCache,
+		apply: func(c *engineConfig) {
+			c.prefixCacheKeys = prefixes
 		},
 	}
 }

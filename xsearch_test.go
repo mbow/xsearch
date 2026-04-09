@@ -219,6 +219,33 @@ func TestSearchWithoutBloomMatchesWithBloom(t *testing.T) {
 	}
 }
 
+func TestPrefixCacheHit(t *testing.T) {
+	items := testItems()
+	prefixes := []string{"b", "bu", "n", "ni"}
+
+	uncached, err := New(items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cached, err := New(items, WithPrefixCache(prefixes))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, prefix := range prefixes {
+		want := uncached.Search(prefix)
+		got := cached.Search(prefix)
+		if len(got) != len(want) {
+			t.Fatalf("prefix %q: got %d results, want %d", prefix, len(got), len(want))
+		}
+		for i := range want {
+			if got[i].ID != want[i].ID {
+				t.Fatalf("prefix %q result %d: got %q, want %q", prefix, i, got[i].ID, want[i].ID)
+			}
+		}
+	}
+}
+
 func TestNewFromSnapshotRejectsBuildOptions(t *testing.T) {
 	items := testItems()
 	engine, err := New(items)
