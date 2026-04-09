@@ -26,6 +26,11 @@ var benchmarkSearchCases = []benchmarkSearchCase{
 		query:   func(c *benchmarkCorpus) string { return c.prefixQuery },
 	},
 	{
+		name:    "cached_prefix/default",
+		variant: benchmarkEngineVariant{name: "default", withPrefixCache: true},
+		query:   func(c *benchmarkCorpus) string { return c.cachedPrefixQuery },
+	},
+	{
 		name:    "typo/default",
 		variant: benchmarkEngineVariant{name: "default"},
 		query:   func(c *benchmarkCorpus) string { return c.typoQuery },

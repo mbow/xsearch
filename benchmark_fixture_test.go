@@ -29,14 +29,16 @@ type benchmarkSize struct {
 }
 
 type benchmarkEngineVariant struct {
-	name string
-	opts []Option
+	name            string
+	opts            []Option
+	withPrefixCache bool
 }
 
 type benchmarkCorpus struct {
 	items               []benchmarkItem
 	exactQuery          string
 	prefixQuery         string
+	cachedPrefixQuery   string
 	typoQuery           string
 	missQuery           string
 	fallbackExactQuery  string
@@ -257,6 +259,7 @@ func newBenchmarkCorpus(docs int) *benchmarkCorpus {
 		items:              items,
 		exactQuery:         exactName,
 		prefixQuery:        benchmarkPrefixQuery(items[0].fields[0].Values[0]),
+		cachedPrefixQuery:  strings.ToLower(items[0].fields[0].Values[0][:1]),
 		typoQuery:          benchmarkTypoQuery(exactName),
 		missQuery:          "zzqxv qjmkp nvthr",
 		fallbackExactQuery: fallbackCategory,
@@ -299,7 +302,7 @@ func benchmarkMutateWord(word string) string {
 }
 
 func benchmarkEngineFor(docs int, variant benchmarkEngineVariant) (*Engine, error) {
-	key := fmt.Sprintf("%d/%s", docs, variant.name)
+	key := fmt.Sprintf("%d/%s/pc=%v", docs, variant.name, variant.withPrefixCache)
 
 	benchmarkEngineCache.mu.Lock()
 	defer benchmarkEngineCache.mu.Unlock()
@@ -309,10 +312,32 @@ func benchmarkEngineFor(docs int, variant benchmarkEngineVariant) (*Engine, erro
 	}
 
 	corpus := benchmarkCorpusFor(docs)
-	engine, err := New(corpus.items, variant.opts...)
+	opts := variant.opts
+	if variant.withPrefixCache {
+		opts = append(append([]Option(nil), opts...), WithPrefixCache(benchmarkPrefixes(corpus.items)))
+	}
+	engine, err := New(corpus.items, opts...)
 	if err != nil {
 		return nil, err
 	}
 	benchmarkEngineCache.data[key] = engine
 	return engine, nil
+}
+
+func benchmarkPrefixes(items []benchmarkItem) []string {
+	seen := make(map[string]struct{})
+	for _, item := range items {
+		name := strings.ToLower(item.fields[0].Values[0])
+		if len(name) >= 1 {
+			seen[name[:1]] = struct{}{}
+		}
+		if len(name) >= 2 {
+			seen[name[:2]] = struct{}{}
+		}
+	}
+	prefixes := make([]string, 0, len(seen))
+	for p := range seen {
+		prefixes = append(prefixes, p)
+	}
+	return prefixes
 }
