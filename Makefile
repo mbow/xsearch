@@ -1,4 +1,4 @@
-.PHONY: bench bench-record bench-save bench-compare bench-compare-baseline bench-pprof-cpu bench-pprof-mem bench-pprof-top-cpu bench-pprof-top-mem test build run prep install-tools
+.PHONY: bench bench-component bench-build bench-search bench-scale bench-hotpaths bench-full bench-readme bench-publish bench-record bench-save bench-compare bench-compare-baseline bench-pprof-cpu bench-pprof-mem bench-pprof-top-cpu bench-pprof-top-mem test build run prep install-tools
 
 BENCH_DIR        = profiles/benchmarks
 PROFILE_DIR      = profiles/pprof
@@ -15,6 +15,11 @@ PPROF           ?= pprof
 PPROF_NAME      ?= bench
 CPU_PROFILE     ?= $(PROFILE_DIR)/$(PPROF_NAME)_cpu.prof
 MEM_PROFILE     ?= $(PROFILE_DIR)/$(PPROF_NAME)_mem.prof
+BENCH_COMPONENT_FILTER = ^BenchmarkComponent$$
+BENCH_BUILD_FILTER     = ^Benchmark(BuildEngine|SnapshotEncode|SnapshotLoad)$$
+BENCH_SEARCH_FILTER    = ^BenchmarkSearch$$
+BENCH_PARALLEL_FILTER  = ^BenchmarkParallelSearch$$
+BENCH_HOTPATH_FILTER   = BenchmarkComponent/(bloom|extract_trigrams|tokenize|bm25|ngram)
 
 install-tools:
 	go install golang.org/x/perf/cmd/benchstat@latest
@@ -22,6 +27,35 @@ install-tools:
 
 bench:
 	go test -run '^$$' -bench '$(BENCH_FILTER)' -benchmem -benchtime=$(BENCH_TIME) -cpu=$(BENCH_CPU) $(BENCH_PKG)
+
+bench-component:
+	$(MAKE) bench BENCH_FILTER='$(BENCH_COMPONENT_FILTER)'
+
+bench-build:
+	$(MAKE) bench BENCH_FILTER='$(BENCH_BUILD_FILTER)'
+
+bench-search:
+	$(MAKE) bench BENCH_FILTER='$(BENCH_SEARCH_FILTER)'
+
+bench-scale:
+	$(MAKE) bench BENCH_FILTER='$(BENCH_PARALLEL_FILTER)' BENCH_CPU=1,2,4,8
+
+bench-hotpaths:
+	$(MAKE) bench BENCH_FILTER='$(BENCH_HOTPATH_FILTER)'
+
+bench-full:
+	$(MAKE) bench BENCH_FILTER='^Benchmark'
+
+bench-readme:
+	@if [ ! -f $(BENCH_LATEST) ]; then \
+		echo "No $(BENCH_LATEST) found. Run 'make bench-record' first."; \
+		exit 1; \
+	fi
+	go run ./cmd/benchreadme -bench $(BENCH_LATEST) -readme README.md
+
+bench-publish:
+	$(MAKE) bench-record
+	$(MAKE) bench-readme
 
 # Record benchmarks with commit metadata header.
 bench-record:
@@ -37,6 +71,7 @@ bench-record:
 		go test -run '^$$' -bench '$(BENCH_FILTER)' -benchmem -count=$(BENCH_COUNT) -benchtime=$(BENCH_TIME) -cpu=$(BENCH_CPU) $(BENCH_PKG); \
 	} > $(BENCH_LATEST)
 	@echo "Saved to $(BENCH_LATEST)"
+	@echo "Run 'make bench-readme' to sync README.md with the latest benchmark summary."
 
 # Save current latest as the comparison baseline (named with commit SHA).
 bench-save:
