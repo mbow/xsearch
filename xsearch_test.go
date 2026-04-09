@@ -246,6 +246,30 @@ func TestPrefixCacheHit(t *testing.T) {
 	}
 }
 
+func TestPrefixCacheBypassWithScorer(t *testing.T) {
+	items := testItems()
+	engine, err := New(items, WithPrefixCache([]string{"bud"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	uncached, _ := New(items)
+	cachedResults := engine.Search("bud")
+	uncachedResults := uncached.Search("bud")
+	if len(cachedResults) != len(uncachedResults) {
+		t.Fatalf("cached count %d != uncached count %d", len(cachedResults), len(uncachedResults))
+	}
+
+	scorer := mapScorer{0: 100, 1: 0}
+	scoredResults := engine.Search("bud", WithScoring(scorer))
+	if len(scoredResults) == 0 {
+		t.Fatal("expected scored results")
+	}
+	if len(scoredResults) == len(cachedResults) && scoredResults[0].Score == cachedResults[0].Score {
+		t.Fatal("scorer should produce different scores than cached results")
+	}
+}
+
 func TestNewFromSnapshotRejectsBuildOptions(t *testing.T) {
 	items := testItems()
 	engine, err := New(items)

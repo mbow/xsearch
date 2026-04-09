@@ -49,14 +49,15 @@ type Item struct {
 
 // Engine is the core search engine.
 type Engine struct {
-	cfg      engineConfig
-	items    []preparedItem
-	idToDoc  map[string]int
-	ordered  []string
-	bloom    *Bloom
-	bm25     *bm25Index
-	ngram    *ngramIndex
-	fallback *fallbackIndex
+	cfg         engineConfig
+	items       []preparedItem
+	idToDoc     map[string]int
+	ordered     []string
+	bloom       *Bloom
+	bm25        *bm25Index
+	ngram       *ngramIndex
+	fallback    *fallbackIndex
+	prefixCache map[string][]Result
 }
 
 type scoredCandidate struct {
@@ -145,6 +146,9 @@ func newEngineFromPrepared(items []preparedItem, cfg engineConfig) *Engine {
 	e.bm25 = newBM25Index(items, cfg)
 	e.ngram = newNgramIndex(items)
 	e.fallback = newFallbackIndex(items, cfg.fallbackField)
+	if len(cfg.prefixCacheKeys) > 0 {
+		e.buildPrefixCache(cfg.prefixCacheKeys)
+	}
 	return e
 }
 
@@ -205,6 +209,20 @@ func (e *Engine) Search(query string, opts ...SearchOption) []Result {
 		return nil
 	}
 
+	if e.prefixCache != nil && sCfg.scorer == nil {
+		if cached, ok := e.prefixCache[query]; ok {
+			return cached
+		}
+	}
+
+	return e.searchWithConfig(query, sCfg)
+}
+
+func (e *Engine) searchInternal(query string) []Result {
+	return e.searchWithConfig(normalizeQuery(query), searchConfig{})
+}
+
+func (e *Engine) searchWithConfig(query string, sCfg searchConfig) []Result {
 	if docs, ok := e.fallback.exact(query); ok {
 		return e.resultsForCandidates(query, fallbackCandidates(docs, nil), sCfg)
 	}
@@ -285,6 +303,24 @@ func (e *Engine) Search(query string, opts ...SearchOption) []Result {
 	}
 
 	return e.resultsForCandidates(query, direct, sCfg)
+}
+
+func (e *Engine) buildPrefixCache(keys []string) {
+	seen := make(map[string]struct{}, len(keys))
+	e.prefixCache = make(map[string][]Result, len(keys))
+	for _, key := range keys {
+		normalized := normalizeQuery(key)
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		if results := e.searchInternal(normalized); len(results) > 0 {
+			e.prefixCache[normalized] = results
+		}
+	}
 }
 
 func fallbackCandidates(docs []int, existing map[int]scoredCandidate) map[int]scoredCandidate {
