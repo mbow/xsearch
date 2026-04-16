@@ -31,12 +31,21 @@ type SearchOption func(*searchConfig)
 
 type searchConfig struct {
 	scorer Scorer
+	scope  string
 }
 
 // WithScoring applies a request-scoped scorer.
 func WithScoring(s Scorer) SearchOption {
 	return func(c *searchConfig) {
 		c.scorer = s
+	}
+}
+
+// WithScope restricts a search to a named scope registered at engine
+// construction time via WithScopes.
+func WithScope(scope string) SearchOption {
+	return func(c *searchConfig) {
+		c.scope = scope
 	}
 }
 
@@ -58,7 +67,10 @@ type Engine struct {
 	ngram       *ngramIndex
 	fallback    *fallbackIndex
 	prefixCache map[string][]Result
+	scopes      map[string]docSet
 }
+
+type docSet map[int]struct{}
 
 type scoredCandidate struct {
 	doc       int
@@ -117,10 +129,10 @@ func New[T Searchable](items []T, opts ...Option) (*Engine, error) {
 		}
 	}
 
-	return newEngineFromPrepared(prepared, cfg), nil
+	return newEngineFromPrepared(prepared, cfg)
 }
 
-func newEngineFromPrepared(items []preparedItem, cfg engineConfig) *Engine {
+func newEngineFromPrepared(items []preparedItem, cfg engineConfig) (*Engine, error) {
 	e := &Engine{
 		cfg:     cfg,
 		items:   items,
@@ -143,13 +155,18 @@ func newEngineFromPrepared(items []preparedItem, cfg engineConfig) *Engine {
 			}
 		}
 	}
+	scopes, err := buildScopes(cfg.scopeIDs, e.idToDoc)
+	if err != nil {
+		return nil, err
+	}
+	e.scopes = scopes
 	e.bm25 = newBM25Index(items, cfg)
 	e.ngram = newNgramIndex(items)
 	e.fallback = newFallbackIndex(items, cfg.fallbackField)
 	if len(cfg.prefixCacheKeys) > 0 {
 		e.buildPrefixCache(cfg.prefixCacheKeys)
 	}
-	return e
+	return e, nil
 }
 
 func prepareFields(id string, fields []Field) ([]internalField, int, error) {
@@ -209,7 +226,7 @@ func (e *Engine) Search(query string, opts ...SearchOption) []Result {
 		return nil
 	}
 
-	if e.prefixCache != nil && sCfg.scorer == nil {
+	if e.prefixCache != nil && sCfg.scorer == nil && sCfg.scope == "" {
 		if cached, ok := e.prefixCache[query]; ok {
 			return cached
 		}
@@ -341,6 +358,14 @@ func fallbackCandidates(docs []int, existing map[int]scoredCandidate) map[int]sc
 }
 
 func (e *Engine) resultsForCandidates(query string, candidates map[int]scoredCandidate, sCfg searchConfig) []Result {
+	if sCfg.scope != "" {
+		allowed, ok := e.scopes[sCfg.scope]
+		if !ok {
+			return nil
+		}
+		candidates = filterCandidates(candidates, allowed)
+	}
+
 	if len(candidates) == 0 {
 		return nil
 	}
@@ -406,6 +431,42 @@ func (e *Engine) resultsForCandidates(query string, candidates map[int]scoredCan
 		}
 	}
 	return results
+}
+
+func buildScopes(defs map[string][]string, idToDoc map[string]int) (map[string]docSet, error) {
+	if len(defs) == 0 {
+		return nil, nil
+	}
+
+	out := make(map[string]docSet, len(defs))
+	for name, ids := range defs {
+		set := make(docSet, len(ids))
+		for _, id := range ids {
+			docID, ok := idToDoc[id]
+			if !ok {
+				return nil, fmt.Errorf("xsearch: scope %q references unknown ID %q", name, id)
+			}
+			set[docID] = struct{}{}
+		}
+		out[name] = set
+	}
+
+	return out, nil
+}
+
+func filterCandidates(candidates map[int]scoredCandidate, allowed docSet) map[int]scoredCandidate {
+	if len(candidates) == 0 {
+		return nil
+	}
+
+	out := make(map[int]scoredCandidate, min(len(candidates), len(allowed)))
+	for docID, cand := range candidates {
+		if _, ok := allowed[docID]; ok {
+			out[docID] = cand
+		}
+	}
+
+	return out
 }
 
 func computeHighlights(item preparedItem, query string) map[string][]Highlight {

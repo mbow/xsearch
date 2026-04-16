@@ -54,6 +54,38 @@ func TestSnapshotWithPrefixCache(t *testing.T) {
 	}
 }
 
+func TestSnapshotWithScopes(t *testing.T) {
+	items := testItems()
+	engine, err := New(items)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := engine.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	restored, err := NewFromSnapshot(data, items, WithScopes(map[string][]string{
+		"beer":  {"budweiser", "bud-light", "funky-buddha"},
+		"shoes": {"nike-air-max", "nike-dunk"},
+	}))
+	if err != nil {
+		t.Fatalf("NewFromSnapshot with WithScopes: %v", err)
+	}
+
+	results := restored.Search("nike", WithScope("shoes"))
+	if len(results) == 0 {
+		t.Fatal("expected scoped search results from restored engine")
+	}
+
+	for _, result := range results {
+		if result.ID != "nike-air-max" && result.ID != "nike-dunk" {
+			t.Fatalf("unexpected scoped result %q", result.ID)
+		}
+	}
+}
+
 func TestSnapshotVersionRejection(t *testing.T) {
 	engine, err := New(testItems())
 	if err != nil {
@@ -68,4 +100,3 @@ func TestSnapshotVersionRejection(t *testing.T) {
 		t.Fatal("expected version rejection")
 	}
 }
-

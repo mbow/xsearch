@@ -132,9 +132,13 @@ func NewFromSnapshot[T Searchable](data []byte, items []T, opts ...Option) (*Eng
 	if payload.Bloom != nil {
 		e.bloom = bloomFromSnapshot(*payload.Bloom)
 	}
+	scopes, err := buildScopes(cfg.scopeIDs, e.idToDoc)
+	if err != nil {
+		return nil, err
+	}
+	e.scopes = scopes
 	if len(cfg.prefixCacheKeys) > 0 {
 		e.buildPrefixCache(cfg.prefixCacheKeys)
 	}
 	return e, nil
 }
-

@@ -1,6 +1,9 @@
 package xsearch
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 type optionKind uint8
 
@@ -12,6 +15,7 @@ const (
 	optionLimit
 	optionFallbackField
 	optionPrefixCache
+	optionScopes
 )
 
 type engineConfig struct {
@@ -22,6 +26,7 @@ type engineConfig struct {
 	limit            int
 	fallbackField    string
 	prefixCacheKeys  []string
+	scopeIDs         map[string][]string
 }
 
 func defaultConfig() engineConfig {
@@ -47,7 +52,7 @@ func (o Option) applyTo(cfg *engineConfig) {
 
 func (o Option) validateForSnapshotLoad() error {
 	switch o.kind {
-	case optionAlpha, optionLimit, optionPrefixCache:
+	case optionAlpha, optionLimit, optionPrefixCache, optionScopes:
 		return nil
 	case optionBloom:
 		return fmt.Errorf("xsearch: WithBloom cannot be used with NewFromSnapshot")
@@ -76,9 +81,17 @@ func (c engineConfig) validate() error {
 	if c.bm25B < 0 || c.bm25B > 1 {
 		return fmt.Errorf("xsearch: BM25 b must be in [0, 1], got %f", c.bm25B)
 	}
+	for name, ids := range c.scopeIDs {
+		if name == "" {
+			return fmt.Errorf("xsearch: scope name cannot be empty")
+		}
+
+		if slices.Contains(ids, "") {
+			return fmt.Errorf("xsearch: scope %q contains empty ID", name)
+		}
+	}
 	return nil
 }
-
 
 // WithBloom enables bloom filter pre-rejection.
 func WithBloom(bitsPerItem int) Option {
@@ -141,3 +154,13 @@ func WithPrefixCache(prefixes []string) Option {
 	}
 }
 
+// WithScopes registers named document scopes that can later be used with
+// WithScope at search time.
+func WithScopes(scopes map[string][]string) Option {
+	return Option{
+		kind: optionScopes,
+		apply: func(c *engineConfig) {
+			c.scopeIDs = scopes
+		},
+	}
+}

@@ -35,18 +35,18 @@ type benchmarkEngineVariant struct {
 }
 
 type benchmarkCorpus struct {
-	items               []benchmarkItem
-	exactQuery          string
-	prefixQuery         string
-	cachedPrefixQuery   string
-	typoQuery           string
-	missQuery           string
-	fallbackExactQuery  string
-	fallbackTypoQuery   string
-	commonQuery         string
-	multiWordQuery      string
-	scorer              benchmarkScorer
-	negativeBloomProbe  string
+	items              []benchmarkItem
+	exactQuery         string
+	prefixQuery        string
+	cachedPrefixQuery  string
+	typoQuery          string
+	missQuery          string
+	fallbackExactQuery string
+	fallbackTypoQuery  string
+	commonQuery        string
+	multiWordQuery     string
+	scorer             benchmarkScorer
+	negativeBloomProbe string
 }
 
 type benchmarkFamily struct {
@@ -201,7 +201,7 @@ func newBenchmarkCorpus(docs int) *benchmarkCorpus {
 	regionsLen := len(benchmarkRegions)
 	seriesLen := len(benchmarkSeries)
 
-	for i := 0; i < docs; i++ {
+	for i := range docs {
 		family := benchmarkFamilies[i%familiesLen]
 		brand := benchmarkBrands[(i/familiesLen)%brandsLen]
 		descriptor := family.descriptors[(i/(familiesLen*brandsLen))%len(family.descriptors)]

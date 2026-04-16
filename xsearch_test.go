@@ -287,6 +287,40 @@ func TestPrefixCacheBypassWithScorer(t *testing.T) {
 	}
 }
 
+func TestWithScopesRejectsUnknownIDs(t *testing.T) {
+	_, err := New(testItems(), WithScopes(map[string][]string{
+		"beer": {"budweiser", "missing-id"},
+	}))
+	if err == nil {
+		t.Fatal("expected error for scope containing unknown ID")
+	}
+}
+
+func TestSearchWithScope(t *testing.T) {
+	engine, err := New(testItems(), WithScopes(map[string][]string{
+		"beer":  {"budweiser", "bud-light", "funky-buddha"},
+		"shoes": {"nike-air-max", "nike-dunk"},
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	results := engine.Search("nike", WithScope("shoes"))
+	if len(results) == 0 {
+		t.Fatal("expected scoped nike results")
+	}
+	for _, result := range results {
+		if result.ID != "nike-air-max" && result.ID != "nike-dunk" {
+			t.Fatalf("unexpected scoped result %q", result.ID)
+		}
+	}
+
+	results = engine.Search("nike", WithScope("beer"))
+	if len(results) != 0 {
+		t.Fatalf("expected no beer-scoped nike results, got %+v", results)
+	}
+}
+
 func TestNewFromSnapshotRejectsBuildOptions(t *testing.T) {
 	items := testItems()
 	engine, err := New(items)
@@ -301,4 +335,3 @@ func TestNewFromSnapshotRejectsBuildOptions(t *testing.T) {
 		t.Fatal("expected build-time option rejection")
 	}
 }
-
