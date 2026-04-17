@@ -507,7 +507,7 @@ func (f filterItem) SearchFields() []Field {
 func newFilterEngine(t *testing.T, n int) *Engine {
 	t.Helper()
 	items := make([]filterItem, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		items[i] = filterItem{id: fmt.Sprintf("d%d", i), name: "lager"}
 	}
 	e, err := New(items, WithLimit(25))

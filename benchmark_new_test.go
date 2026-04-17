@@ -6,16 +6,18 @@ import (
 )
 
 func BenchmarkFold_ASCII(b *testing.B) {
+	b.ReportAllocs()
 	s := "plain ascii drink name with no marks"
-	for i := 0; i < b.N; i++ {
-		_ = Fold(s)
+	for b.Loop() {
+		Fold(s)
 	}
 }
 
 func BenchmarkFold_Latin1(b *testing.B) {
+	b.ReportAllocs()
 	s := "Moët & Chandon Impérial Brut Rosé"
-	for i := 0; i < b.N; i++ {
-		_ = Fold(s)
+	for b.Loop() {
+		Fold(s)
 	}
 }
 
@@ -54,51 +56,51 @@ func newBenchEngine(b *testing.B, foldOn bool) *Engine {
 
 func BenchmarkSearch_UnicodeFold_Off(b *testing.B) {
 	e := newBenchEngine(b, false)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = e.Search("drink number 42")
+	b.ReportAllocs()
+	for b.Loop() {
+		e.Search("drink number 42")
 	}
 }
 
 func BenchmarkSearch_UnicodeFold_On(b *testing.B) {
 	e := newBenchEngine(b, true)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = e.Search("drink number 42")
+	b.ReportAllocs()
+	for b.Loop() {
+		e.Search("drink number 42")
 	}
 }
 
 func BenchmarkSearchWithFallback_PrimaryHits(b *testing.B) {
 	e := newBenchEngine(b, false)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = e.SearchWithFallback("drink number 42", []string{"lager", "beer"})
+	b.ReportAllocs()
+	for b.Loop() {
+		e.SearchWithFallback("drink number 42", []string{"lager", "beer"})
 	}
 }
 
 func BenchmarkSearchWithFallback_CascadeHits(b *testing.B) {
 	e := newBenchEngine(b, false)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = e.SearchWithFallback("nonexistent-xyz", []string{"lager", "beer"})
+	b.ReportAllocs()
+	for b.Loop() {
+		e.SearchWithFallback("nonexistent-xyz", []string{"lager", "beer"})
 	}
 }
 
 func BenchmarkWithFilter_NilFilter(b *testing.B) {
 	e := newBenchEngine(b, false)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = e.Search("drink number 42", WithFilter(nil))
+	b.ReportAllocs()
+	for b.Loop() {
+		e.Search("drink number 42", WithFilter(nil))
 	}
 }
 
-func BenchmarkWithFilter_KeepHalf(b *testing.B) {
+func BenchmarkWithFilter_KeepMost(b *testing.B) {
 	e := newBenchEngine(b, false)
-	keepHalf := func(id string) bool {
-		return len(id) > 2 // arbitrary, keeps most
+	keepMost := func(id string) bool {
+		return len(id) > 2 // keeps all but d0..d9
 	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = e.Search("drink number 42", WithFilter(keepHalf))
+	b.ReportAllocs()
+	for b.Loop() {
+		e.Search("drink number 42", WithFilter(keepMost))
 	}
 }
