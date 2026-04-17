@@ -407,3 +407,88 @@ func keysOf(m map[string][]Result) []string {
 	}
 	return out
 }
+
+type fbItem struct {
+	id, name, group string
+}
+
+func (f fbItem) SearchID() string { return f.id }
+func (f fbItem) SearchFields() []Field {
+	return []Field{
+		{Name: "name", Values: []string{f.name}, Weight: 1.0},
+		{Name: "comparison_group", Values: []string{f.group}, Weight: 0.8},
+	}
+}
+
+func newFallbackEngine(t *testing.T) *Engine {
+	t.Helper()
+	items := []fbItem{
+		{id: "heineken", name: "Heineken", group: "lager"},
+		{id: "corona", name: "Corona Extra", group: "lager"},
+		{id: "guinness", name: "Guinness", group: "stout"},
+	}
+	e, err := New(items, WithFallbackField("comparison_group"), WithLimit(10))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return e
+}
+
+func TestSearchWithFallback_PrimaryHits_LevelMinusOne(t *testing.T) {
+	e := newFallbackEngine(t)
+	results, level := e.SearchWithFallback("heineken", []string{"lager", "beer"})
+	if level != -1 {
+		t.Errorf("expected level -1 (primary match), got %d", level)
+	}
+	if len(results) == 0 || results[0].ID != "heineken" {
+		t.Errorf("expected heineken first, got %v", results)
+	}
+}
+
+func TestSearchWithFallback_FirstCascadeHits_LevelZero(t *testing.T) {
+	e := newFallbackEngine(t)
+	results, level := e.SearchWithFallback("nonexistent-zzz", []string{"lager", "beer"})
+	if level != 0 {
+		t.Errorf("expected level 0 (cascade[0] match), got %d", level)
+	}
+	if len(results) < 2 {
+		t.Errorf("expected at least 2 lager results, got %d", len(results))
+	}
+}
+
+func TestSearchWithFallback_DeepCascade_CorrectLevel(t *testing.T) {
+	e := newFallbackEngine(t)
+	// "nonexistent-zzz" (primary) and "xyz-nomatch" (cascade[0]) match nothing;
+	// "stout" (cascade[1]) hits Guinness.
+	results, level := e.SearchWithFallback("nonexistent-zzz",
+		[]string{"xyz-nomatch", "stout"})
+	if level != 1 {
+		t.Errorf("expected level 1, got %d", level)
+	}
+	if len(results) != 1 || results[0].ID != "guinness" {
+		t.Errorf("expected guinness, got %v", results)
+	}
+}
+
+func TestSearchWithFallback_NothingMatches_LevelEqualsLen(t *testing.T) {
+	e := newFallbackEngine(t)
+	results, level := e.SearchWithFallback("nonexistent-zzz",
+		[]string{"nope-1", "nope-2"})
+	if level != 2 {
+		t.Errorf("expected level 2 (==len(cascade)), got %d", level)
+	}
+	if len(results) != 0 {
+		t.Errorf("expected zero results, got %d", len(results))
+	}
+}
+
+func TestSearchWithFallback_NilCascade_BehavesLikeSearch(t *testing.T) {
+	e := newFallbackEngine(t)
+	results, level := e.SearchWithFallback("heineken", nil)
+	if level != -1 {
+		t.Errorf("expected level -1, got %d", level)
+	}
+	if len(results) == 0 {
+		t.Errorf("expected non-empty results")
+	}
+}

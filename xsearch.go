@@ -244,6 +244,28 @@ func (e *Engine) Search(query string, opts ...SearchOption) []Result {
 	return e.searchWithConfig(query, sCfg)
 }
 
+// SearchWithFallback runs primary as a normal Search. If primary returns
+// no results, walks cascade in order, returning the first non-empty level.
+//
+// Returned int identifies which level matched:
+//
+//	-1               primary matched, cascade not walked
+//	0..len(cascade)  cascade index that matched
+//	len(cascade)     nothing matched at any level
+//
+// All SearchOptions (filter, scope, scoring) apply to every level.
+func (e *Engine) SearchWithFallback(primary string, cascade []string, opts ...SearchOption) ([]Result, int) {
+	if results := e.Search(primary, opts...); len(results) > 0 {
+		return results, -1
+	}
+	for i, level := range cascade {
+		if results := e.Search(level, opts...); len(results) > 0 {
+			return results, i
+		}
+	}
+	return nil, len(cascade)
+}
+
 func (e *Engine) searchInternal(query string) []Result {
 	if e.cfg.unicodeFold {
 		query = Fold(query)
