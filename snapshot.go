@@ -107,7 +107,7 @@ func NewFromSnapshot[T Searchable](data []byte, items []T, opts ...Option) (*Eng
 		if _, ok := idToDoc[id]; ok {
 			return nil, fmt.Errorf("xsearch: corrupted snapshot duplicate ID %q", id)
 		}
-		fields, primaryField, err := prepareFields(id, item.SearchFields())
+		fields, primaryField, err := prepareFields(id, item.SearchFields(), cfg)
 		if err != nil {
 			return nil, err
 		}

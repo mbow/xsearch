@@ -118,7 +118,7 @@ func New[T Searchable](items []T, opts ...Option) (*Engine, error) {
 		}
 		seenIDs[id] = struct{}{}
 
-		fields, primaryField, err := prepareFields(id, item.SearchFields())
+		fields, primaryField, err := prepareFields(id, item.SearchFields(), cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +169,7 @@ func newEngineFromPrepared(items []preparedItem, cfg engineConfig) (*Engine, err
 	return e, nil
 }
 
-func prepareFields(id string, fields []Field) ([]internalField, int, error) {
+func prepareFields(id string, fields []Field, cfg engineConfig) ([]internalField, int, error) {
 	cloned := cloneFields(fields)
 	if len(cloned) == 0 {
 		return nil, 0, fmt.Errorf("xsearch: item %q has no fields", id)
@@ -192,10 +192,16 @@ func prepareFields(id string, fields []Field) ([]internalField, int, error) {
 		if len(field.Values) == 0 {
 			continue
 		}
+		newValues := make([]string, len(field.Values))
 		lowerValues := make([]string, len(field.Values))
 		for i, v := range field.Values {
+			if cfg.unicodeFold {
+				v = Fold(v)
+			}
+			newValues[i] = v
 			lowerValues[i] = strings.ToLower(v)
 		}
+		field.Values = newValues
 
 		out = append(out, internalField{
 			Name:        field.Name,
@@ -221,6 +227,9 @@ func (e *Engine) Search(query string, opts ...SearchOption) []Result {
 		opt(&sCfg)
 	}
 
+	if e.cfg.unicodeFold {
+		query = Fold(query)
+	}
 	query = normalizeQuery(query)
 	if query == "" {
 		return nil
@@ -236,6 +245,9 @@ func (e *Engine) Search(query string, opts ...SearchOption) []Result {
 }
 
 func (e *Engine) searchInternal(query string) []Result {
+	if e.cfg.unicodeFold {
+		query = Fold(query)
+	}
 	return e.searchWithConfig(normalizeQuery(query), searchConfig{})
 }
 

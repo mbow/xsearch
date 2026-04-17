@@ -335,3 +335,39 @@ func TestNewFromSnapshotRejectsBuildOptions(t *testing.T) {
 		t.Fatal("expected build-time option rejection")
 	}
 }
+
+type accentItem struct {
+	id, name string
+}
+
+func (a accentItem) SearchID() string { return a.id }
+func (a accentItem) SearchFields() []Field {
+	return []Field{{Name: "name", Values: []string{a.name}, Weight: 1.0}}
+}
+
+func TestWithUnicodeFold_OffByDefault_DistinctTokens(t *testing.T) {
+	items := []accentItem{{id: "moet", name: "Moët & Chandon"}}
+	e, err := New(items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := e.Search("moet"); len(r) != 0 {
+		t.Errorf("expected zero results without fold, got %d", len(r))
+	}
+}
+
+func TestWithUnicodeFold_On_BothQueriesMatch(t *testing.T) {
+	items := []accentItem{{id: "moet", name: "Moët & Chandon"}}
+	e, err := New(items, WithUnicodeFold())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{"moet", "Moët", "MOET", "Moet"} {
+		t.Run(q, func(t *testing.T) {
+			r := e.Search(q)
+			if len(r) != 1 || r[0].ID != "moet" {
+				t.Errorf("query %q: got %v, want [{ID:moet ...}]", q, r)
+			}
+		})
+	}
+}
