@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -197,4 +199,28 @@ func sanitizeScorerValue(v float64) float64 {
 		return 0
 	}
 	return v
+}
+
+// Fold returns the Unicode-folded form of s: NFKD-normalized with combining
+// marks stripped. Idempotent. Used by WithUnicodeFold during tokenization
+// and exported so callers (e.g. brand-alias maps) can mirror the exact
+// same normalization at lookup time.
+func Fold(s string) string {
+	if s == "" {
+		return ""
+	}
+	// typographic replacements before decomposition
+	s = strings.ReplaceAll(s, "œ", "oe")
+	s = strings.ReplaceAll(s, "æ", "ae")
+	s = strings.ReplaceAll(s, "ß", "ss")
+
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range norm.NFKD.String(s) {
+		if unicode.Is(unicode.Mn, r) {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
