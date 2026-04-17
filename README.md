@@ -279,3 +279,20 @@ _Generated from `profiles/benchmarks/bench-latest.txt` via `make bench-readme`. 
 ## License
 
 MIT
+
+## Changelog
+
+### v0.1.0
+
+- `Fold(s string) string` — exported Unicode NFKD normalization with combining-mark
+  stripping and ligature expansion (`œ→oe`, `æ→ae`, `ß→ss`). Idempotent.
+- `WithUnicodeFold() Option` — index- and query-time accent-insensitive search
+  using `Fold`. Integrated with `WithPrefixCache` so prewarm keys hit after
+  folding+normalization.
+- `Engine.SearchWithFallback(primary, cascade, opts ...SearchOption) ([]Result, int)` —
+  runs `primary`; if empty, walks `cascade` in order and returns the first
+  non-empty level. Level `-1` = primary matched; `0..len(cascade)-1` = cascade
+  index; `len(cascade)` = no match.
+- `WithFilter(pred func(id string) bool) SearchOption` — per-search predicate
+  applied after scope filtering and before scoring/limit. Prefix-cache fast
+  path is bypassed when a filter is set. Nil filter is zero-overhead.
