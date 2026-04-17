@@ -1,7 +1,9 @@
 package xsearch
 
 import (
+	"fmt"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -490,5 +492,65 @@ func TestSearchWithFallback_NilCascade_BehavesLikeSearch(t *testing.T) {
 	}
 	if len(results) == 0 {
 		t.Errorf("expected non-empty results")
+	}
+}
+
+type filterItem struct {
+	id, name string
+}
+
+func (f filterItem) SearchID() string { return f.id }
+func (f filterItem) SearchFields() []Field {
+	return []Field{{Name: "name", Values: []string{f.name}, Weight: 1.0}}
+}
+
+func newFilterEngine(t *testing.T, n int) *Engine {
+	t.Helper()
+	items := make([]filterItem, n)
+	for i := 0; i < n; i++ {
+		items[i] = filterItem{id: fmt.Sprintf("d%d", i), name: "lager"}
+	}
+	e, err := New(items, WithLimit(25))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return e
+}
+
+func TestWithFilter_NilFilter_SameAsNoOption(t *testing.T) {
+	e := newFilterEngine(t, 30)
+	a := e.Search("lager")
+	b := e.Search("lager", WithFilter(nil))
+	if len(a) != len(b) {
+		t.Errorf("nil filter changed result count: %d vs %d", len(a), len(b))
+	}
+}
+
+func TestWithFilter_RejectsHalf(t *testing.T) {
+	e := newFilterEngine(t, 30)
+	keepEven := func(id string) bool {
+		// keep d0, d2, d4...
+		return strings.HasSuffix(id, "0") || strings.HasSuffix(id, "2") ||
+			strings.HasSuffix(id, "4") || strings.HasSuffix(id, "6") ||
+			strings.HasSuffix(id, "8")
+	}
+	results := e.Search("lager", WithFilter(keepEven))
+	for _, r := range results {
+		if !keepEven(r.ID) {
+			t.Errorf("filter let through odd ID %q", r.ID)
+		}
+	}
+}
+
+func TestWithFilter_AppliedBeforeLimit(t *testing.T) {
+	// 30 docs, limit 25, filter rejects 90% — should still return up to 15
+	// (the survivors), NOT 1 (which would be 25 unfiltered then filtered).
+	e := newFilterEngine(t, 30)
+	keepFirstThree := func(id string) bool {
+		return id == "d0" || id == "d1" || id == "d2"
+	}
+	results := e.Search("lager", WithFilter(keepFirstThree))
+	if len(results) != 3 {
+		t.Errorf("expected 3 survivors, got %d", len(results))
 	}
 }

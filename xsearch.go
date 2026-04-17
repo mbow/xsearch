@@ -32,6 +32,7 @@ type SearchOption func(*searchConfig)
 type searchConfig struct {
 	scorer Scorer
 	scope  string
+	filter func(id string) bool
 }
 
 // WithScoring applies a request-scoped scorer.
@@ -46,6 +47,17 @@ func WithScoring(s Scorer) SearchOption {
 func WithScope(scope string) SearchOption {
 	return func(c *searchConfig) {
 		c.scope = scope
+	}
+}
+
+// WithFilter installs a per-search predicate evaluated on candidate hits
+// after scoring, before limit. Drops items where pred(id) == false.
+//
+// Predicate sees the doc ID so callers can compose with their own
+// ID→domain-object lookup. Pass nil to disable; cost is zero when not set.
+func WithFilter(pred func(id string) bool) SearchOption {
+	return func(c *searchConfig) {
+		c.filter = pred
 	}
 }
 
@@ -235,7 +247,7 @@ func (e *Engine) Search(query string, opts ...SearchOption) []Result {
 		return nil
 	}
 
-	if e.prefixCache != nil && sCfg.scorer == nil && sCfg.scope == "" {
+	if e.prefixCache != nil && sCfg.scorer == nil && sCfg.scope == "" && sCfg.filter == nil {
 		if cached, ok := e.prefixCache[query]; ok {
 			return cached
 		}
@@ -401,6 +413,16 @@ func (e *Engine) resultsForCandidates(query string, candidates map[int]scoredCan
 			return nil
 		}
 		candidates = filterCandidates(candidates, allowed)
+	}
+
+	if sCfg.filter != nil {
+		filtered := make(map[int]scoredCandidate, len(candidates))
+		for docID, cand := range candidates {
+			if sCfg.filter(e.items[docID].ID) {
+				filtered[docID] = cand
+			}
+		}
+		candidates = filtered
 	}
 
 	if len(candidates) == 0 {
