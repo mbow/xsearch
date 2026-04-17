@@ -97,7 +97,7 @@ func parseBenchFile(path string) (*benchSummary, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	summary := &benchSummary{
 		index: make(map[string]*benchGroup),

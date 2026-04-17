@@ -68,6 +68,7 @@ for _, r := range results {
 | `WithLimit(n)` | 10 | Max results per search [2, 100] |
 | `WithFallbackField(name)` | none | Field for group fallback |
 | `WithPrefixCache(prefixes)` | disabled | Precompute results for given queries |
+| `WithUnicodeFold()` | disabled | Accent-insensitive index/query normalization |
 
 ## External Scoring
 
@@ -118,8 +119,12 @@ engine2, _ := xsearch.NewFromSnapshot(data, items)
 ```
 
 Snapshots are self-contained CBOR blobs with a version header (`XSRC`).
-Build-time options are stored in the snapshot. Only `WithLimit` can be
-overridden at load time.
+Build-time index options are stored in the snapshot, including
+`WithUnicodeFold()`. Load-time options `WithLimit`, `WithPrefixCache`, and
+`WithScopes` may still be supplied on restore.
+
+Snapshot version `2` breaks compatibility with older snapshot blobs. Rebuild
+any existing snapshots before calling `NewFromSnapshot`.
 
 ## Bloom Filter
 
@@ -279,3 +284,29 @@ _Generated from `profiles/benchmarks/bench-latest.txt` via `make bench-readme`. 
 ## License
 
 MIT
+
+## Changelog
+
+### v0.2.0
+
+- Snapshot format bumped to version `2`; rebuild any existing snapshot blobs
+  before calling `NewFromSnapshot`.
+- `WithUnicodeFold()` is now serialized into snapshots and restored on load, so
+  folded engines round-trip without behavior drift.
+- `NewFromSnapshot` now rejects `WithUnicodeFold()` as a load-time override
+  because it is part of the persisted snapshot config.
+
+### v0.1.0
+
+- `Fold(s string) string` — exported Unicode NFKD normalization with combining-mark
+  stripping and ligature expansion (`œ→oe`, `æ→ae`, `ß→ss`). Idempotent.
+- `WithUnicodeFold() Option` — index- and query-time accent-insensitive search
+  using `Fold`. Integrated with `WithPrefixCache` so prewarm keys hit after
+  folding+normalization.
+- `Engine.SearchWithFallback(primary, cascade, opts ...SearchOption) ([]Result, int)` —
+  runs `primary`; if empty, walks `cascade` in order and returns the first
+  non-empty level. Level `-1` = primary matched; `0..len(cascade)-1` = cascade
+  index; `len(cascade)` = no match.
+- `WithFilter(pred func(id string) bool) SearchOption` — per-search predicate
+  applied after scope filtering and before scoring/limit. Prefix-cache fast
+  path is bypassed when a filter is set. Nil filter is zero-overhead.

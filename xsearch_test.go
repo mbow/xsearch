@@ -1,7 +1,9 @@
 package xsearch
 
 import (
+	"fmt"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -333,5 +335,222 @@ func TestNewFromSnapshotRejectsBuildOptions(t *testing.T) {
 	}
 	if _, err := NewFromSnapshot(snapshot, items, WithBloom(10)); err == nil {
 		t.Fatal("expected build-time option rejection")
+	}
+}
+
+type accentItem struct {
+	id, name string
+}
+
+func (a accentItem) SearchID() string { return a.id }
+func (a accentItem) SearchFields() []Field {
+	return []Field{{Name: "name", Values: []string{a.name}, Weight: 1.0}}
+}
+
+func TestWithUnicodeFold_OffByDefault_DistinctTokens(t *testing.T) {
+	items := []accentItem{{id: "moet", name: "Moët & Chandon"}}
+	e, err := New(items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := e.Search("moet"); len(r) != 0 {
+		t.Errorf("expected zero results without fold, got %d", len(r))
+	}
+}
+
+func TestWithUnicodeFold_On_BothQueriesMatch(t *testing.T) {
+	items := []accentItem{{id: "moet", name: "Moët & Chandon"}}
+	e, err := New(items, WithUnicodeFold())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{"moet", "Moët", "MOET", "Moet"} {
+		t.Run(q, func(t *testing.T) {
+			r := e.Search(q)
+			if len(r) != 1 || r[0].ID != "moet" {
+				t.Errorf("query %q: got %v, want [{ID:moet ...}]", q, r)
+			}
+		})
+	}
+}
+
+func TestWithUnicodeFold_PrefixCache_HitsAcrossAccents(t *testing.T) {
+	items := []accentItem{{id: "moet", name: "Moët & Chandon"}}
+	e, err := New(items,
+		WithUnicodeFold(),
+		WithPrefixCache([]string{"Moët"}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The cache key must match what Search looks up: query is folded then
+	// normalized, so the stored key must be "moet" (folded+normalized),
+	// not "moët" (normalized-only). Without folding at build time, every
+	// Search call misses the cache even though it still finds the doc via
+	// the fallback search path — defeating the purpose of the prewarm.
+	if _, ok := e.prefixCache["moet"]; !ok {
+		t.Errorf("prefix cache missing expected key %q; keys=%v",
+			"moet", keysOf(e.prefixCache))
+	}
+	for _, q := range []string{"moet", "Moët", "Moet", "MOET"} {
+		t.Run(q, func(t *testing.T) {
+			r := e.Search(q)
+			if len(r) != 1 || r[0].ID != "moet" {
+				t.Errorf("query %q: got %v, want 1 hit {ID:moet}", q, r)
+			}
+		})
+	}
+}
+
+func keysOf(m map[string][]Result) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
+type fbItem struct {
+	id, name, group string
+}
+
+func (f fbItem) SearchID() string { return f.id }
+func (f fbItem) SearchFields() []Field {
+	return []Field{
+		{Name: "name", Values: []string{f.name}, Weight: 1.0},
+		{Name: "comparison_group", Values: []string{f.group}, Weight: 0.8},
+	}
+}
+
+func newFallbackEngine(t *testing.T) *Engine {
+	t.Helper()
+	items := []fbItem{
+		{id: "heineken", name: "Heineken", group: "lager"},
+		{id: "corona", name: "Corona Extra", group: "lager"},
+		{id: "guinness", name: "Guinness", group: "stout"},
+	}
+	e, err := New(items, WithFallbackField("comparison_group"), WithLimit(10))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return e
+}
+
+func TestSearchWithFallback_PrimaryHits_LevelMinusOne(t *testing.T) {
+	e := newFallbackEngine(t)
+	results, level := e.SearchWithFallback("heineken", []string{"lager", "beer"})
+	if level != -1 {
+		t.Errorf("expected level -1 (primary match), got %d", level)
+	}
+	if len(results) == 0 || results[0].ID != "heineken" {
+		t.Errorf("expected heineken first, got %v", results)
+	}
+}
+
+func TestSearchWithFallback_FirstCascadeHits_LevelZero(t *testing.T) {
+	e := newFallbackEngine(t)
+	results, level := e.SearchWithFallback("nonexistent-zzz", []string{"lager", "beer"})
+	if level != 0 {
+		t.Errorf("expected level 0 (cascade[0] match), got %d", level)
+	}
+	if len(results) < 2 {
+		t.Errorf("expected at least 2 lager results, got %d", len(results))
+	}
+}
+
+func TestSearchWithFallback_DeepCascade_CorrectLevel(t *testing.T) {
+	e := newFallbackEngine(t)
+	// "nonexistent-zzz" (primary) and "xyz-nomatch" (cascade[0]) match nothing;
+	// "stout" (cascade[1]) hits Guinness.
+	results, level := e.SearchWithFallback("nonexistent-zzz",
+		[]string{"xyz-nomatch", "stout"})
+	if level != 1 {
+		t.Errorf("expected level 1, got %d", level)
+	}
+	if len(results) != 1 || results[0].ID != "guinness" {
+		t.Errorf("expected guinness, got %v", results)
+	}
+}
+
+func TestSearchWithFallback_NothingMatches_LevelEqualsLen(t *testing.T) {
+	e := newFallbackEngine(t)
+	results, level := e.SearchWithFallback("nonexistent-zzz",
+		[]string{"nope-1", "nope-2"})
+	if level != 2 {
+		t.Errorf("expected level 2 (==len(cascade)), got %d", level)
+	}
+	if len(results) != 0 {
+		t.Errorf("expected zero results, got %d", len(results))
+	}
+}
+
+func TestSearchWithFallback_NilCascade_BehavesLikeSearch(t *testing.T) {
+	e := newFallbackEngine(t)
+	results, level := e.SearchWithFallback("heineken", nil)
+	if level != -1 {
+		t.Errorf("expected level -1, got %d", level)
+	}
+	if len(results) == 0 {
+		t.Errorf("expected non-empty results")
+	}
+}
+
+type filterItem struct {
+	id, name string
+}
+
+func (f filterItem) SearchID() string { return f.id }
+func (f filterItem) SearchFields() []Field {
+	return []Field{{Name: "name", Values: []string{f.name}, Weight: 1.0}}
+}
+
+func newFilterEngine(t *testing.T, n int) *Engine {
+	t.Helper()
+	items := make([]filterItem, n)
+	for i := range n {
+		items[i] = filterItem{id: fmt.Sprintf("d%d", i), name: "lager"}
+	}
+	e, err := New(items, WithLimit(25))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return e
+}
+
+func TestWithFilter_NilFilter_SameAsNoOption(t *testing.T) {
+	e := newFilterEngine(t, 30)
+	a := e.Search("lager")
+	b := e.Search("lager", WithFilter(nil))
+	if len(a) != len(b) {
+		t.Errorf("nil filter changed result count: %d vs %d", len(a), len(b))
+	}
+}
+
+func TestWithFilter_RejectsHalf(t *testing.T) {
+	e := newFilterEngine(t, 30)
+	keepEven := func(id string) bool {
+		// keep d0, d2, d4...
+		return strings.HasSuffix(id, "0") || strings.HasSuffix(id, "2") ||
+			strings.HasSuffix(id, "4") || strings.HasSuffix(id, "6") ||
+			strings.HasSuffix(id, "8")
+	}
+	results := e.Search("lager", WithFilter(keepEven))
+	for _, r := range results {
+		if !keepEven(r.ID) {
+			t.Errorf("filter let through odd ID %q", r.ID)
+		}
+	}
+}
+
+func TestWithFilter_AppliedBeforeLimit(t *testing.T) {
+	// 30 docs, limit 25, filter rejects 90% — should still return up to 15
+	// (the survivors), NOT 1 (which would be 25 unfiltered then filtered).
+	e := newFilterEngine(t, 30)
+	keepFirstThree := func(id string) bool {
+		return id == "d0" || id == "d1" || id == "d2"
+	}
+	results := e.Search("lager", WithFilter(keepFirstThree))
+	if len(results) != 3 {
+		t.Errorf("expected 3 survivors, got %d", len(results))
 	}
 }

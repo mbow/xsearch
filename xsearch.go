@@ -32,6 +32,7 @@ type SearchOption func(*searchConfig)
 type searchConfig struct {
 	scorer Scorer
 	scope  string
+	filter func(id string) bool
 }
 
 // WithScoring applies a request-scoped scorer.
@@ -46,6 +47,18 @@ func WithScoring(s Scorer) SearchOption {
 func WithScope(scope string) SearchOption {
 	return func(c *searchConfig) {
 		c.scope = scope
+	}
+}
+
+// WithFilter installs a per-search predicate evaluated on candidate hits
+// after scope filtering, before scoring and limit. Drops items where
+// pred(id) == false.
+//
+// Predicate sees the doc ID so callers can compose with their own
+// ID→domain-object lookup. Pass nil to disable; cost is zero when not set.
+func WithFilter(pred func(id string) bool) SearchOption {
+	return func(c *searchConfig) {
+		c.filter = pred
 	}
 }
 
@@ -118,7 +131,7 @@ func New[T Searchable](items []T, opts ...Option) (*Engine, error) {
 		}
 		seenIDs[id] = struct{}{}
 
-		fields, primaryField, err := prepareFields(id, item.SearchFields())
+		fields, primaryField, err := prepareFields(id, item.SearchFields(), cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +182,7 @@ func newEngineFromPrepared(items []preparedItem, cfg engineConfig) (*Engine, err
 	return e, nil
 }
 
-func prepareFields(id string, fields []Field) ([]internalField, int, error) {
+func prepareFields(id string, fields []Field, cfg engineConfig) ([]internalField, int, error) {
 	cloned := cloneFields(fields)
 	if len(cloned) == 0 {
 		return nil, 0, fmt.Errorf("xsearch: item %q has no fields", id)
@@ -192,16 +205,27 @@ func prepareFields(id string, fields []Field) ([]internalField, int, error) {
 		if len(field.Values) == 0 {
 			continue
 		}
+		newValues := make([]string, len(field.Values))
 		lowerValues := make([]string, len(field.Values))
+		var origValues []string
+		if cfg.unicodeFold {
+			origValues = make([]string, len(field.Values))
+		}
 		for i, v := range field.Values {
+			if cfg.unicodeFold {
+				origValues[i] = v
+				v = Fold(v)
+			}
+			newValues[i] = v
 			lowerValues[i] = strings.ToLower(v)
 		}
 
 		out = append(out, internalField{
-			Name:        field.Name,
-			Values:      slices.Clone(field.Values),
-			LowerValues: lowerValues,
-			Weight:      field.Weight,
+			Name:           field.Name,
+			Values:         newValues,
+			LowerValues:    lowerValues,
+			OriginalValues: origValues,
+			Weight:         field.Weight,
 		})
 		if field.Weight > primaryWeight {
 			primaryField = len(out) - 1
@@ -221,12 +245,15 @@ func (e *Engine) Search(query string, opts ...SearchOption) []Result {
 		opt(&sCfg)
 	}
 
+	if e.cfg.unicodeFold {
+		query = Fold(query)
+	}
 	query = normalizeQuery(query)
 	if query == "" {
 		return nil
 	}
 
-	if e.prefixCache != nil && sCfg.scorer == nil && sCfg.scope == "" {
+	if e.prefixCache != nil && sCfg.scorer == nil && sCfg.scope == "" && sCfg.filter == nil {
 		if cached, ok := e.prefixCache[query]; ok {
 			return cached
 		}
@@ -235,7 +262,32 @@ func (e *Engine) Search(query string, opts ...SearchOption) []Result {
 	return e.searchWithConfig(query, sCfg)
 }
 
+// SearchWithFallback runs primary as a normal Search. If primary returns
+// no results, walks cascade in order, returning the first non-empty level.
+//
+// Returned int identifies which level matched:
+//
+//	-1               primary matched, cascade not walked
+//	0..len(cascade)  cascade index that matched
+//	len(cascade)     nothing matched at any level
+//
+// All SearchOptions (filter, scope, scoring) apply to every level.
+func (e *Engine) SearchWithFallback(primary string, cascade []string, opts ...SearchOption) ([]Result, int) {
+	if results := e.Search(primary, opts...); len(results) > 0 {
+		return results, -1
+	}
+	for i, level := range cascade {
+		if results := e.Search(level, opts...); len(results) > 0 {
+			return results, i
+		}
+	}
+	return nil, len(cascade)
+}
+
 func (e *Engine) searchInternal(query string) []Result {
+	if e.cfg.unicodeFold {
+		query = Fold(query)
+	}
 	return e.searchWithConfig(normalizeQuery(query), searchConfig{})
 }
 
@@ -326,6 +378,9 @@ func (e *Engine) buildPrefixCache(keys []string) {
 	seen := make(map[string]struct{}, len(keys))
 	e.prefixCache = make(map[string][]Result, len(keys))
 	for _, key := range keys {
+		if e.cfg.unicodeFold {
+			key = Fold(key)
+		}
 		normalized := normalizeQuery(key)
 		if normalized == "" {
 			continue
@@ -364,6 +419,16 @@ func (e *Engine) resultsForCandidates(query string, candidates map[int]scoredCan
 			return nil
 		}
 		candidates = filterCandidates(candidates, allowed)
+	}
+
+	if sCfg.filter != nil {
+		filtered := make(map[int]scoredCandidate, len(candidates))
+		for docID, cand := range candidates {
+			if sCfg.filter(e.items[docID].ID) {
+				filtered[docID] = cand
+			}
+		}
+		candidates = filtered
 	}
 
 	if len(candidates) == 0 {
