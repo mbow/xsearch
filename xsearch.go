@@ -214,11 +214,10 @@ func prepareFields(id string, fields []Field, cfg engineConfig) ([]internalField
 			newValues[i] = v
 			lowerValues[i] = strings.ToLower(v)
 		}
-		field.Values = newValues
 
 		out = append(out, internalField{
 			Name:        field.Name,
-			Values:      slices.Clone(field.Values),
+			Values:      newValues,
 			LowerValues: lowerValues,
 			Weight:      field.Weight,
 		})
