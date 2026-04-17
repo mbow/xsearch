@@ -338,6 +338,9 @@ func (e *Engine) buildPrefixCache(keys []string) {
 	seen := make(map[string]struct{}, len(keys))
 	e.prefixCache = make(map[string][]Result, len(keys))
 	for _, key := range keys {
+		if e.cfg.unicodeFold {
+			key = Fold(key)
+		}
 		normalized := normalizeQuery(key)
 		if normalized == "" {
 			continue

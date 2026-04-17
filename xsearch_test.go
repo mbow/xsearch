@@ -371,3 +371,39 @@ func TestWithUnicodeFold_On_BothQueriesMatch(t *testing.T) {
 		})
 	}
 }
+
+func TestWithUnicodeFold_PrefixCache_HitsAcrossAccents(t *testing.T) {
+	items := []accentItem{{id: "moet", name: "Moët & Chandon"}}
+	e, err := New(items,
+		WithUnicodeFold(),
+		WithPrefixCache([]string{"Moët"}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The cache key must match what Search looks up: query is folded then
+	// normalized, so the stored key must be "moet" (folded+normalized),
+	// not "moët" (normalized-only). Without folding at build time, every
+	// Search call misses the cache even though it still finds the doc via
+	// the fallback search path — defeating the purpose of the prewarm.
+	if _, ok := e.prefixCache["moet"]; !ok {
+		t.Errorf("prefix cache missing expected key %q; keys=%v",
+			"moet", keysOf(e.prefixCache))
+	}
+	for _, q := range []string{"moet", "Moët", "Moet", "MOET"} {
+		t.Run(q, func(t *testing.T) {
+			r := e.Search(q)
+			if len(r) != 1 || r[0].ID != "moet" {
+				t.Errorf("query %q: got %v, want 1 hit {ID:moet}", q, r)
+			}
+		})
+	}
+}
+
+func keysOf(m map[string][]Result) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
