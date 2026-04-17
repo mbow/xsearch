@@ -51,7 +51,8 @@ func WithScope(scope string) SearchOption {
 }
 
 // WithFilter installs a per-search predicate evaluated on candidate hits
-// after scoring, before limit. Drops items where pred(id) == false.
+// after scope filtering, before scoring and limit. Drops items where
+// pred(id) == false.
 //
 // Predicate sees the doc ID so callers can compose with their own
 // ID→domain-object lookup. Pass nil to disable; cost is zero when not set.
