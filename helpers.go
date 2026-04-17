@@ -18,10 +18,11 @@ const (
 )
 
 type internalField struct {
-	Name        string
-	Values      []string
-	LowerValues []string
-	Weight      float64
+	Name           string
+	Values         []string
+	LowerValues    []string
+	OriginalValues []string
+	Weight         float64
 }
 
 type preparedItem struct {
@@ -55,9 +56,13 @@ func cloneFields(fields []Field) []Field {
 func cloneItem(item preparedItem) Item {
 	fields := make([]Field, len(item.Fields))
 	for i, f := range item.Fields {
+		vals := f.Values
+		if f.OriginalValues != nil {
+			vals = f.OriginalValues
+		}
 		fields[i] = Field{
 			Name:   f.Name,
-			Values: slices.Clone(f.Values),
+			Values: slices.Clone(vals),
 			Weight: f.Weight,
 		}
 	}
@@ -208,6 +213,17 @@ func sanitizeScorerValue(v float64) float64 {
 func Fold(s string) string {
 	if s == "" {
 		return ""
+	}
+
+	ascii := true
+	for i := 0; i < len(s); i++ {
+		if s[i] >= utf8.RuneSelf {
+			ascii = false
+			break
+		}
+	}
+	if ascii {
+		return s
 	}
 	// typographic replacements before decomposition
 	s = strings.ReplaceAll(s, "œ", "oe")

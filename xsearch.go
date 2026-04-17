@@ -207,8 +207,13 @@ func prepareFields(id string, fields []Field, cfg engineConfig) ([]internalField
 		}
 		newValues := make([]string, len(field.Values))
 		lowerValues := make([]string, len(field.Values))
+		var origValues []string
+		if cfg.unicodeFold {
+			origValues = make([]string, len(field.Values))
+		}
 		for i, v := range field.Values {
 			if cfg.unicodeFold {
+				origValues[i] = v
 				v = Fold(v)
 			}
 			newValues[i] = v
@@ -216,10 +221,11 @@ func prepareFields(id string, fields []Field, cfg engineConfig) ([]internalField
 		}
 
 		out = append(out, internalField{
-			Name:        field.Name,
-			Values:      newValues,
-			LowerValues: lowerValues,
-			Weight:      field.Weight,
+			Name:           field.Name,
+			Values:         newValues,
+			LowerValues:    lowerValues,
+			OriginalValues: origValues,
+			Weight:         field.Weight,
 		})
 		if field.Weight > primaryWeight {
 			primaryField = len(out) - 1
