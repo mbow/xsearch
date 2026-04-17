@@ -54,7 +54,7 @@ func (o Option) applyTo(cfg *engineConfig) {
 
 func (o Option) validateForSnapshotLoad() error {
 	switch o.kind {
-	case optionAlpha, optionLimit, optionPrefixCache, optionScopes, optionUnicodeFold:
+	case optionAlpha, optionLimit, optionPrefixCache, optionScopes:
 		return nil
 	case optionBloom:
 		return fmt.Errorf("xsearch: WithBloom cannot be used with NewFromSnapshot")
@@ -62,6 +62,8 @@ func (o Option) validateForSnapshotLoad() error {
 		return fmt.Errorf("xsearch: WithBM25 cannot be used with NewFromSnapshot")
 	case optionFallbackField:
 		return fmt.Errorf("xsearch: WithFallbackField cannot be used with NewFromSnapshot")
+	case optionUnicodeFold:
+		return fmt.Errorf("xsearch: WithUnicodeFold is stored in the snapshot and cannot be used with NewFromSnapshot")
 	default:
 		return nil
 	}
